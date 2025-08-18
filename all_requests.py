@@ -1,5 +1,9 @@
 import time
 import requests
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 ERROR_SLEEP_TIME = 60
 
@@ -97,3 +101,6 @@ def send_reply_question(token, id, reply, state):
             break
     print(f"Requests send_reply_question: {result.status_code} STOP")
     return result
+
+def get_ans_gpt():
+    gpt_token = os.getenv("GPT_TOKEN")
