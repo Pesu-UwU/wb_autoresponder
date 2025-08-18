@@ -3,7 +3,6 @@ import pandas as pd
 
 import all_requests
 
-
 class autoresponder:
 
     def __init__(self, key_table, name, wb_token):
