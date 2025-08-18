@@ -39,7 +39,7 @@ def all_start_to_user():
                     #     time.sleep(120)
 
 def main():
-    schedule.every(30).seconds.do(all_start_to_user)  # разумный стартовый интервал
+    schedule.every(30).seconds.do(all_start_to_user)  #
     while True:
         schedule.run_pending()
         time.sleep(1)
