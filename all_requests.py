@@ -35,7 +35,7 @@ def send_reply_feedback(token, id, reply):
     }
     params = {
         "id": id,
-        "reply": reply
+        "text": reply
     }
 
     for i in range(3):
@@ -66,9 +66,34 @@ def get_quations(token, isAnswered, take, skip):
         result = requests.get(url=url, headers=headers, params=params, timeout=60)
         time.sleep(1)
         if result.status_code != 200:
-            print(f"Requests get_feedback: {result.status_code} REPEAT AFTER {ERROR_SLEEP_TIME} SECOND")
+            print(f"Requests get_quations: {result.status_code} REPEAT AFTER {ERROR_SLEEP_TIME} SECOND")
             time.sleep(ERROR_SLEEP_TIME)
         else:
             break
-    print(f"Requests get_feedback: {result.status_code} STOP")
+    print(f"Requests get_quations: {result.status_code} STOP")
+    return result
+
+def send_reply_question(token, id, reply, state):
+    url = "https://feedbacks-api.wildberries.ru/api/v1/questions"
+    headers = {
+        "Authorization": token,
+        "Content-Type": "application/json"
+    }
+    params = {
+        "id": id,
+        "answer": {
+            "text": reply
+        },
+        "state": state
+    }
+
+    for i in range(3):
+        result = requests.patch(url=url, headers=headers, params=params, timeout=60)
+        time.sleep(1)
+        if result.status_code != 200:
+            print(f"Requests send_reply_question: {result.status_code} REPEAT AFTER {ERROR_SLEEP_TIME} SECOND")
+            time.sleep(ERROR_SLEEP_TIME)
+        else:
+            break
+    print(f"Requests send_reply_question: {result.status_code} STOP")
     return result
