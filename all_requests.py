@@ -1,26 +1,41 @@
+import json
 import time
 import requests
 from dotenv import load_dotenv
 import os
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 load_dotenv()
 
 ERROR_SLEEP_TIME = 60
 MAX_RETRIES = 3
 TIMEOUT = 60
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-def _request(method: str, url: str, headers: Dict[str, str], params: Dict[str, Any]) -> requests.Response:
+def print_json(resp: requests.Response):
+    print(json.dumps(resp.json(), indent=4, ensure_ascii=False))
+
+def _request(
+    method: str,
+    url: str,
+    headers: Dict[str, str],
+    retry: float,
+    params: Optional[Any] = None,   # query-параметры в URL
+    json: Optional[Any] = None      # JSON-тело запроса
+) -> requests.Response:
     for attempt in range(1, MAX_RETRIES + 1):
-        resp = requests.request(method, url, headers=headers, params=params, timeout=TIMEOUT)
-        if (method == "POST" and resp.status_code == 204) or (method in ("GET", "PATCH") and resp.ok):
+        resp = requests.request(method, url, headers=headers, params=params, json=json, timeout=TIMEOUT)
+        #if (method == "POST" and resp.status_code == 204) or (method in ("GET", "PATCH") and resp.ok):
+        if resp.ok:
             print(f"[INFO] HTTP {method} {url} OK ({resp.status_code})")
-            return resp
+            time.sleep(retry)
+            return resp.json()
         print(f"[WARN] HTTP {method} {url} -> {resp.status_code} "
               f"(attempt {attempt}/{MAX_RETRIES}). Retry in {ERROR_SLEEP_TIME}s")
+        print_json(resp)
         time.sleep(ERROR_SLEEP_TIME)
     # последняя попытка: вернём как есть
-    return resp
+    return resp.json()
 
 
 def get_feedback(token, isAnswered, take, skip):
@@ -28,6 +43,7 @@ def get_feedback(token, isAnswered, take, skip):
         "GET",
         "https://feedbacks-api.wildberries.ru/api/v1/feedbacks",
         {"Authorization": token, "Content-Type": "application/json"},
+        0.4,
         {"take": take, "isAnswered": isAnswered, "skip": skip, "order": "dateAsc"},
     )
 
@@ -36,6 +52,7 @@ def send_reply_feedback(token, id, reply):
         "POST",
         "https://feedbacks-api.wildberries.ru/api/v1/feedbacks/answer",
         {"Authorization": token, "Content-Type": "application/json"},
+        0.4,
         {"id": id, "text": reply},
     )
 
@@ -44,6 +61,7 @@ def get_quastions(token, isAnswered, take, skip):  # можно переимен
         "GET",
         "https://feedbacks-api.wildberries.ru/api/v1/questions",
         {"Authorization": token, "Content-Type": "application/json"},
+        0.4,
         {"take": take, "isAnswered": isAnswered, "skip": skip, "order": "dateAsc"},
     )
 
@@ -52,8 +70,24 @@ def send_reply_question(token, id, reply, state):
         "PATCH",
         "https://feedbacks-api.wildberries.ru/api/v1/questions",
         {"Authorization": token, "Content-Type": "application/json"},
+        0.4,
         {"id": id, "answer": {"text": reply}, "state": state},
     )
+
+def ask_gpt(prompt: str, model: str = "gpt-4o-mini"):
+    return _request(
+        "POST",
+        "https://api.openai.com/v1/chat/completions",
+        {"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type": "application/json"},
+        20,
+        json = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.7,
+        }
+    )
+
+#def charac(token,)
 
 # def get_feedback(token, isAnswered, take, skip):
 #     url = "https://feedbacks-api.wildberries.ru/api/v1/feedbacks"
