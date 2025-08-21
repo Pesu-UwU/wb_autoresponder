@@ -53,17 +53,6 @@ class autoresponder:
                 if q.get("state") == "suppliersPortalSynch":  # только новые запросы без отклоненных
                     result.loc[len(result)] = [q["id"], q["text"], q["createdDate"]]
 
-
-                     # ← генератор, удобно для потока
-                # fd = i["text"]
-                # date = i["createdDate"]
-                # mark = i["productValuation"]
-                # df = pd.DataFrame(d)
-                # if (fd != ""):
-                #     print(fd)
-                #     print(date)
-                #     print(mark)
-
         return result
 
 
