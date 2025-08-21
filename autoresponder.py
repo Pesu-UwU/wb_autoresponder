@@ -17,7 +17,6 @@ class autoresponder:
 
     def feedback(self):
         rows: List[Dict] = []
-        #result = pd.DataFrame(columns=["id", "text", "date", "mark"])
 
         take = 5000
         res = all_requests.get_feedback(self.wb_token, "true", take, 0)
