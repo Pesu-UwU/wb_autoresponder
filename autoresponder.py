@@ -38,16 +38,6 @@ class autoresponder:
                         "user_name": fb.get("userName")
                     })
         return pd.DataFrame(rows, columns=["id", "text", "date", "mark", "user_name"])
-                # fd = i["text"]
-                # date = i["createdDate"]
-                # mark = i["productValuation"]
-                # df = pd.DataFrame(d)
-                # if (fd != ""):
-                #     print(fd)
-                #     print(date)
-                #     print(mark)
-
-        return result
 
     def question(self):
         result = pd.DataFrame(columns=["id", "text", "date"])
