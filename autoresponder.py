@@ -12,10 +12,10 @@ class autoresponder:
         self.key_table = key_table
         self.name = name
         self.wb_token = wb_token
-        gc = gspread.service_account(filename="credentials.json")
-        self.sh = gc.open_by_key(key_table)
+        self.gc = gspread.service_account(filename="credentials.json")
+        self.sh = self.gc.open_by_key(key_table)
 
-    def feedback(self):
+    def feedback(self) -> pd.DataFrame:
         rows: List[Dict] = []
 
         take = 5000
@@ -38,8 +38,8 @@ class autoresponder:
                     })
         return pd.DataFrame(rows, columns=["id", "text", "date", "mark", "user_name"])
 
-    def question(self):
-        result = pd.DataFrame(columns=["id", "text", "date"])
+    def question(self) -> pd.DataFrame:
+        rows: List[Dict] = []
 
         take = 10000
         res = all_requests.get_quations(self.wb_token, "true", take, 0)
@@ -51,12 +51,15 @@ class autoresponder:
             res = all_requests.get_feedback(self.wb_token, "false", take, coef * take)
             for q in res["data"]["questions"]:
                 if q.get("state") == "suppliersPortalSynch":  # только новые запросы без отклоненных
-                    result.loc[len(result)] = [q["id"], q["text"], q["createdDate"]]
+                    rows.append({
+                        "id": q["id"],
+                        "text": q["text"],
+                        "date": q["createdDate"],
+                    })
+        return pd.DataFrame(rows, columns=["id", "text", "date"])
 
-        return result
 
-
-    def compose_reply(self, obj): #  будет генериться с помощью api gpt
+    def compose_reply(self, obj) -> str: #  будет генериться с помощью api gpt
         reply = ""
         if hasattr(obj, "mark"):
             prompt = (f"Ты продавец товара на маркетплейсе Wildberries. Тебе нужно ответить на отзыв покупателя по следующим шаблонам. Ответы к положительным комментариям (оценка: больше или равна 4):"
@@ -69,6 +72,8 @@ class autoresponder:
             data = ask_gpt(prompt)
             reply = data["choices"][0]["message"]["content"]
             print(reply)
+        else:
+            sh = self.gc.open_by_key("")
         return reply
 
 
@@ -78,7 +83,7 @@ class autoresponder:
             worksheet = self.sh.worksheet("Отзывы")
             worksheet.append_row([obj.text, obj.date, obj.mark, reply])
         else:
-            state = "none" if reply == "Отклонен" else "wbRu"
+            state = "none" if reply == "Отклонено" else "wbRu"
             all_requests.send_reply_question(self.wb_token, obj.id, reply, state)
             worksheet = self.sh.worksheet("Вопросы")
             worksheet.append_row([obj.text, obj.date, reply])
