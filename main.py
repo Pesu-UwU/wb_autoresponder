@@ -1,11 +1,18 @@
+import os
 import time
 
 import gspread
 import pandas as pd
 import schedule
+import telebot
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from autoresponder import autoresponder
 
+TELEBOT_TOKEN = os.getenv("TELEBOT_TOKEN")
+bot = telebot.TeleBot(TELEBOT_TOKEN)
 
 class update:
     def __init__(self, key_table, name, wb_token):
@@ -15,13 +22,21 @@ class update:
         print(f"Start {self.client.name}")
         self.client.start_autoresponder()
 
-def all_start_to_user():
+def get_clients() -> pd.DataFrame:
     gc = gspread.service_account(filename="credentials.json")
     sh = gc.open_by_key("18L3gx1ps1p7fTHVCcte7tHjjW3PyLoJpD79TdMNkbOY")
     data = sh.worksheet("data").get_all_values()
-    print(data)
     df = pd.DataFrame(data[1:], columns=data[0])
-    print(df)
+    return df
+
+def all_start_to_user():
+    for i in range(3):
+        try:
+            df = get_clients()
+            break
+        except Exception as ex:
+            bot.send_message("-1002417112074", f"[WARN] Clients haven't got \nError: {ex}")
+            time.sleep(60)
     for row in df.itertuples():
         if row.type == "Autoresponder":
             if row.enabled == "1":
@@ -39,7 +54,8 @@ def all_start_to_user():
                     #     time.sleep(120)
 
 def main():
-    schedule.every(30).seconds.do(all_start_to_user)  #
+    all_start_to_user()
+    schedule.every(5).minutes.do(all_start_to_user)
     while True:
         schedule.run_pending()
         time.sleep(1)

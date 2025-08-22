@@ -1,9 +1,18 @@
+import json
+import os
+
 import gspread
 import pandas as pd
 from typing import Dict, Any, List
 
+from dotenv import load_dotenv
+
 import all_requests
 from all_requests import ask_gpt
+
+load_dotenv()
+
+GOOGLE_TABLE_KEY_DATA_OF_PATTERNS = os.getenv("GOOGLE_TABLE_KEY_DATA_OF_PATTERNS")
 
 
 class autoresponder:
@@ -19,13 +28,13 @@ class autoresponder:
         rows: List[Dict] = []
 
         take = 5000
-        res = all_requests.get_feedback(self.wb_token, "true", take, 0)
+        res = all_requests.get_feedbacks(self.wb_token, "true", take, 0)
         cnt_false = res["data"]["countUnanswered"]
         print(cnt_false)
 
         n = int((cnt_false + take - 1) / take)
         for coef in range(n):
-            res = all_requests.get_feedback(self.wb_token, "false", take, coef * take)
+            res = all_requests.get_feedbacks(self.wb_token, "false", take, coef * take)
             for fb in res["data"]["feedbacks"]:
                 text = fb.get("text")
                 if text:
@@ -42,15 +51,16 @@ class autoresponder:
         rows: List[Dict] = []
 
         take = 10000
-        res = all_requests.get_quations(self.wb_token, "true", take, 0)
+        res = all_requests.get_quastions(self.wb_token, "true", take, 0)
         cnt_false = res["data"]["countUnanswered"]
         print(cnt_false)
 
         n = int((cnt_false + take - 1) / take)
         for coef in range(n):
-            res = all_requests.get_feedback(self.wb_token, "false", take, coef * take)
+            res = all_requests.get_quastions(self.wb_token, "false", take, coef * take)
             for q in res["data"]["questions"]:
                 if q.get("state") == "suppliersPortalSynch":  # только новые запросы без отклоненных
+                    print(q["text"])
                     rows.append({
                         "id": q["id"],
                         "text": q["text"],
@@ -73,7 +83,20 @@ class autoresponder:
             reply = data["choices"][0]["message"]["content"]
             print(reply)
         else:
-            sh = self.gc.open_by_key("")
+            sh = self.gc.open_by_key(GOOGLE_TABLE_KEY_DATA_OF_PATTERNS).worksheet("1 Вариант")
+            data = json.dumps(sh.get_all_values(), ensure_ascii=False)
+            #data = "" + "\n".join(sh.get_all_values())
+            # print(data)
+            # exit(0)
+
+            prompt = (f"Ты продавец товара на маркетплейсе Wildberries. Тебе нужно ответить на отзыв покупателя по следующим шаблонам. Данные будут в виде JSON. "
+                      f"Если отсутствует ответ на вопрос, значит ответом является последний встретившийся. Шаблоны: {data}. "
+                      f"Если считаешь, что вопрос следует отклонить, верни строку Отклонено. При необходимости - импровизируй. "
+                      f"Если считаешь, что ты не попал в суть вопроса с вероятностью 1/2, то в конце ответа поставь 2 символа *"
+                      f"Вот вопрос: {obj.text}")
+            data = ask_gpt(prompt)
+            reply = data["choices"][0]["message"]["content"]
+            print(reply)
         return reply
 
 
@@ -84,7 +107,7 @@ class autoresponder:
             worksheet.append_row([obj.text, obj.date, obj.mark, reply])
         else:
             state = "none" if reply == "Отклонено" else "wbRu"
-            all_requests.send_reply_question(self.wb_token, obj.id, reply, state)
+            #all_requests.send_reply_question(self.wb_token, obj.id, reply, state)
             worksheet = self.sh.worksheet("Вопросы")
             worksheet.append_row([obj.text, obj.date, reply])
 
@@ -104,7 +127,7 @@ class autoresponder:
 
 
     def start_autoresponder(self):
-        self.update_feedbacks()
-        #self.update_questions()
+        #self.update_feedbacks()
+        self.update_questions()
 
 

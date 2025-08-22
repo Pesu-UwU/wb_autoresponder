@@ -38,7 +38,7 @@ def _request(
     return resp.json()
 
 
-def get_feedback(token, isAnswered, take, skip):
+def get_feedbacks(token, isAnswered, take, skip):
     return _request(
         "GET",
         "https://feedbacks-api.wildberries.ru/api/v1/feedbacks",
