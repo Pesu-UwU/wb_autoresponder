@@ -92,8 +92,12 @@ class Autoresponder:
             resp = all_requests.ask_gpt(prompt)
 
         data = resp.json()
-        choices = data.get("choices")
-        reply = choices[0]["message"]["content"] if (resp.ok and choices and choices[0]["message"].get("content")) else ""
+        reply = ""
+        if resp.ok:
+            data = resp.json()
+            choices = data.get("choices") or []
+            if choices:
+                reply = choices[0].get("message", {}).get("content", "")
         if not reply:
             print(f"[WARN] GPT empty reply: {data}")
             all_requests.debug_print_json(resp)
