@@ -29,13 +29,13 @@ def _request(
         if resp.ok:
             print(f"[INFO] HTTP {method} {url} OK ({resp.status_code})")
             time.sleep(retry)
-            return resp.json()
+            return resp
         print(f"[WARN] HTTP {method} {url} -> {resp.status_code} "
               f"(attempt {attempt}/{MAX_RETRIES}). Retry in {ERROR_SLEEP_TIME}s")
         print_json(resp)
         time.sleep(ERROR_SLEEP_TIME)
     # последняя попытка: вернём как есть
-    return resp.json()
+    return resp
 
 
 def get_feedbacks(token, isAnswered, take, skip):

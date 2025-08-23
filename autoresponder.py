@@ -29,13 +29,13 @@ class autoresponder:
         rows: List[Dict] = []
 
         take = 5000
-        res = all_requests.get_feedbacks(self.wb_token, "true", take, 0)
+        res = all_requests.get_feedbacks(self.wb_token, "true", take, 0).json()
         cnt_false = res["data"]["countUnanswered"]
         print(cnt_false)
 
         n = int((cnt_false + take - 1) / take)
         for coef in range(n):
-            res = all_requests.get_feedbacks(self.wb_token, "false", take, coef * take)
+            res = all_requests.get_feedbacks(self.wb_token, "false", take, coef * take).json()
             for fb in res["data"]["feedbacks"]:
                 text = fb.get("text")
                 if text:
@@ -52,13 +52,13 @@ class autoresponder:
         rows: List[Dict] = []
 
         take = 10000
-        res = all_requests.get_questions(self.wb_token, "true", take, 0)
+        res = all_requests.get_questions(self.wb_token, "true", take, 0).json()
         cnt_false = res["data"]["countUnanswered"]
         print(cnt_false)
 
         n = int((cnt_false + take - 1) / take)
         for coef in range(n):
-            res = all_requests.get_questions(self.wb_token, "false", take, coef * take)
+            res = all_requests.get_questions(self.wb_token, "false", take, coef * take).json()
             for q in res["data"]["questions"]:
                 if q.get("state") == "suppliersPortalSynch":  # только новые запросы без отклоненных
                     print(q["text"])
@@ -80,7 +80,7 @@ class autoresponder:
                       f"[Добрый день. Спешим к вам с извинениями!! Очень жаль, что покупка не смогла вас порадовать.\nС уважением, представители бренда!],"
                       f"[Здраствуйте, Марина! Благодарим Вас за обратную связь. Нам искренне жаль, что Вы разочарованы покупкой.\nС уважением, представители бренда!]."
                       f"Текст отзыва: {obj.text}, оценка отзыва: {obj.mark}, имя клиента: {obj.user_name}. Если у пользователя есть нормальное имя, то обратись к нему по имени. По необходимости можешь отойти от шаблона.")
-            data = ask_gpt(prompt)
+            data = ask_gpt(prompt).json()
             reply = data["choices"][0]["message"]["content"]
             print(reply)
         else:
@@ -89,10 +89,10 @@ class autoresponder:
 
             prompt = (f"Ты продавец товара на маркетплейсе Wildberries. Тебе нужно ответить на отзыв покупателя по следующим шаблонам. Данные будут в виде JSON. "
                       f"Если отсутствует ответ на вопрос, значит верным ответом является последний встретившийся. Шаблоны: {data}. "
-                      f"Если считаешь, что вопрос следует отклонить, верни строку Отклонено. При необходимости - импровизируй. "
+                      f"Если считаешь, что вопрос следует отклонить, верни строку REJECTED. При необходимости - импровизируй. "
                       f"Если считаешь, что ты не попал в суть вопроса с вероятностью 1/2, то в конце ответа поставь 2 символа *. Если не уверен, что стоит отклонить - не отклоняй."
                       f"Вот вопрос: {obj.text}")
-            data = ask_gpt(prompt)
+            data = ask_gpt(prompt).json()
             reply = data["choices"][0]["message"]["content"]
             print(reply)
         return reply
@@ -100,10 +100,11 @@ class autoresponder:
 
     def _send_reply(self, obj, reply: str):
         if hasattr(obj, "mark"):
-            all_requests.send_reply_feedback(self.wb_token, obj.id, reply)
+            resp = all_requests.send_reply_feedback(self.wb_token, obj.id, reply)
         else:
-            state = "none" if reply == "Отклонено" else "wbRu"
-            all_requests.send_reply_question(self.wb_token, obj.id, reply, state)
+            state = "none" if reply == "REJECTED" else "wbRu"
+            resp = all_requests.send_reply_question(self.wb_token, obj.id, reply, state)
+        return resp.ok
 
     def _append_rows_bulk(self, name_sheet: str, rows: list[list]):
         ws = self.sh.worksheet(name_sheet)
@@ -115,8 +116,9 @@ class autoresponder:
         feedbacks = self._get_feedbacks()
         for fb in feedbacks.itertuples():
             reply = self._compose_reply(fb)
-            self._send_reply(fb, reply)
-            rows_to_write.append([fb.text, fb.date, fb.mark, reply])
+            check = self._send_reply(fb, reply)
+            if check:
+                rows_to_write.append([fb.text, fb.date, fb.mark, reply])
         if rows_to_write:
             self._append_rows_bulk("Отзывы", rows_to_write)
 
@@ -126,15 +128,16 @@ class autoresponder:
         questions = self._get_questions()
         for q in questions.itertuples():
             reply = self._compose_reply(q)
-            #self._send_reply(q, reply)
-            rows_to_write.append([q.text, q.date, reply])
+            check = self._send_reply(q, reply)
+            if check:
+                rows_to_write.append([q.text, q.date, reply])
         if rows_to_write:
             self._append_rows_bulk("Вопросы", rows_to_write)
 
 
 
     def start_autoresponder(self):
-        #self.update_feedbacks()
+        self.update_feedbacks()
         self.update_questions()
 
 
