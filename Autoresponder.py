@@ -1,5 +1,6 @@
 import json
 import os
+import time
 
 import gspread
 from gspread.utils import ValueInputOption
@@ -13,6 +14,8 @@ import all_requests
 load_dotenv()
 
 GOOGLE_TABLE_KEY_DATA_OF_PATTERNS = os.getenv("GOOGLE_TABLE_KEY_DATA_OF_PATTERNS")
+ERROR_SLEEP_TIME = 60
+MAX_RETRIES = 3
 
 
 class Autoresponder:
@@ -101,6 +104,7 @@ class Autoresponder:
         if not reply:
             print(f"[WARN] GPT empty reply: {data}")
             all_requests.debug_print_json(resp)
+        print(f"[GPT] reply: {reply}")
         return reply
 
 
@@ -110,11 +114,23 @@ class Autoresponder:
         else:
             state = "none" if reply == "REJECTED" else "wbRu"
             resp = all_requests.send_reply_question(self.wb_token, obj.id, reply, state)
+        if resp.ok:
+            print(f"[INFO] Sent reply for id={obj.id}")
+        else:
+            print(f"[WARN] Failed to send reply for id={obj.id}, status={resp.status_code}")
         return resp.ok
 
     def _append_rows_bulk(self, name_sheet: str, rows: list[list]):
-        ws = self.sh.worksheet(name_sheet)
-        ws.append_rows(rows, value_input_option=ValueInputOption.raw)  # noqa
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                ws = self.sh.worksheet(name_sheet)
+                ws.append_rows(rows, value_input_option=ValueInputOption.raw)  # noqa
+                print(f"[INFO] Appended {len(rows)} rows to sheet '{name_sheet}' for {self.name}")
+                break
+            except Exception as ex:
+                print(f"[WARN] Failed to append rows to sheet '{name_sheet}' for {self.name}: {ex}")
+                time.sleep(ERROR_SLEEP_TIME)
+
 
     def update_feedbacks(self):
         rows_to_write = []

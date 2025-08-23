@@ -19,7 +19,7 @@ class Update:
         self.client = Autoresponder(key_table, name, wb_token)
 
     def start(self):
-        print(f"Start {self.client.name}")
+        print(f"[INFO] Start autoresponder for {self.client.name}")
         self.client.start_autoresponder()
 
 def get_clients() -> pd.DataFrame:
