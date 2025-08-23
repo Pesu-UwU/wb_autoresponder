@@ -90,7 +90,7 @@ class autoresponder:
             prompt = (f"Ты продавец товара на маркетплейсе Wildberries. Тебе нужно ответить на отзыв покупателя по следующим шаблонам. Данные будут в виде JSON. "
                       f"Если отсутствует ответ на вопрос, значит верным ответом является последний встретившийся. Шаблоны: {data}. "
                       f"Если считаешь, что вопрос следует отклонить, верни строку Отклонено. При необходимости - импровизируй. "
-                      f"Если считаешь, что ты не попал в суть вопроса с вероятностью 1/2, то в конце ответа поставь 2 символа *"
+                      f"Если считаешь, что ты не попал в суть вопроса с вероятностью 1/2, то в конце ответа поставь 2 символа *. Если не уверен, что стоит отклонить - не отклоняй."
                       f"Вот вопрос: {obj.text}")
             data = ask_gpt(prompt)
             reply = data["choices"][0]["message"]["content"]
@@ -107,7 +107,7 @@ class autoresponder:
 
     def _append_rows_bulk(self, name_sheet: str, rows: list[list]):
         ws = self.sh.worksheet(name_sheet)
-        ws.append_rows(rows, value_input_option=ValueInputOption.RAW)  # noqa
+        ws.append_rows(rows, value_input_option=ValueInputOption.raw)
 
 
     def update_feedbacks(self):
@@ -117,7 +117,8 @@ class autoresponder:
             reply = self._compose_reply(fb)
             rows_to_write.append([fb.text, fb.date, fb.mark, reply])
             self._send_reply(fb, reply)
-        self._append_rows_bulk("Отзывы", rows_to_write)
+        if rows_to_write:
+            self._append_rows_bulk("Отзывы", rows_to_write)
 
 
     def update_questions(self):
@@ -127,12 +128,13 @@ class autoresponder:
             reply = self._compose_reply(q)
             rows_to_write.append([q.text, q.date, reply])
             self._send_reply(q, reply)
-        self._append_rows_bulk("Вопросы", rows_to_write)
+        if rows_to_write:
+            self._append_rows_bulk("Вопросы", rows_to_write)
 
 
 
     def start_autoresponder(self):
-        #self.update_feedbacks()
+        self.update_feedbacks()
         self.update_questions()
 
 
