@@ -9,14 +9,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from autoresponder import autoresponder
+from Autoresponder import Autoresponder
 
 TELEBOT_TOKEN = os.getenv("TELEBOT_TOKEN")
 bot = telebot.TeleBot(TELEBOT_TOKEN)
 
-class update:
+class Update:
     def __init__(self, key_table, name, wb_token):
-        self.client = autoresponder(key_table, name, wb_token)
+        self.client = Autoresponder(key_table, name, wb_token)
 
     def start(self):
         print(f"Start {self.client.name}")
@@ -37,13 +37,13 @@ def all_start_to_user():
         except Exception as ex:
             bot.send_message("-1002417112074", f"[WARN] Clients haven't got \nError: {ex}")
             time.sleep(60)
-    for row in df.itertuples():
-        if row.type == "Autoresponder":
-            if row.enabled == "1":
-                name = row.name
-                wb_token = row.wb_token
-                key_table = row.key_table
-                client = update(key_table, name, wb_token)
+    for row in df.itertuples():   # noqa
+        if row.type == "Autoresponder":  # noqa
+            if row.enabled == "1":   # noqa
+                name = row.name  # noqa
+                wb_token = row.wb_token  # noqa
+                key_table = row.key_table  # noqa
+                client = Update(key_table, name, wb_token)
                 #for j in range(3):
                     # try:
                 client.start()

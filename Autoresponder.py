@@ -4,19 +4,19 @@ import os
 import gspread
 from gspread.utils import ValueInputOption
 import pandas as pd
-from typing import Dict, Any, List
+from typing import Dict, List
 
 from dotenv import load_dotenv
 
 import all_requests
-from all_requests import ask_gpt
+#from all_requests import ask_gpt
 
 load_dotenv()
 
 GOOGLE_TABLE_KEY_DATA_OF_PATTERNS = os.getenv("GOOGLE_TABLE_KEY_DATA_OF_PATTERNS")
 
 
-class autoresponder:
+class Autoresponder:
 
     def __init__(self, key_table, name, wb_token):
         self.key_table = key_table
@@ -37,14 +37,14 @@ class autoresponder:
         for coef in range(n):
             res = all_requests.get_feedbacks(self.wb_token, "false", take, coef * take).json()
             for fb in res["data"]["feedbacks"]:
-                text = fb.get("text")
+                text = fb["text"]
                 if text:
                     rows.append({
                         "id": fb["id"],
                         "text": text,
                         "date": fb["createdDate"],
-                        "mark": fb.get("productValuation"),
-                        "user_name": fb.get("userName")
+                        "mark": fb["productValuation"],
+                        "user_name": fb["userName"]
                     })
         return pd.DataFrame(rows, columns=["id", "text", "date", "mark", "user_name"])
 
@@ -60,7 +60,7 @@ class autoresponder:
         for coef in range(n):
             res = all_requests.get_questions(self.wb_token, "false", take, coef * take).json()
             for q in res["data"]["questions"]:
-                if q.get("state") == "suppliersPortalSynch":  # только новые запросы без отклоненных
+                if q["state"] == "suppliersPortalSynch":  # только новые запросы без отклоненных
                     print(q["text"])
                     rows.append({
                         "id": q["id"],
@@ -80,9 +80,7 @@ class autoresponder:
                       f"[Добрый день. Спешим к вам с извинениями!! Очень жаль, что покупка не смогла вас порадовать.\nС уважением, представители бренда!],"
                       f"[Здраствуйте, Марина! Благодарим Вас за обратную связь. Нам искренне жаль, что Вы разочарованы покупкой.\nС уважением, представители бренда!]."
                       f"Текст отзыва: {obj.text}, оценка отзыва: {obj.mark}, имя клиента: {obj.user_name}. Если у пользователя есть нормальное имя, то обратись к нему по имени. По необходимости можешь отойти от шаблона.")
-            data = ask_gpt(prompt).json()
-            reply = data["choices"][0]["message"]["content"]
-            print(reply)
+            resp = all_requests.ask_gpt(prompt)
         else:
             sh = self.gc.open_by_key(GOOGLE_TABLE_KEY_DATA_OF_PATTERNS).worksheet("1 Вариант")
             data = json.dumps(sh.get_all_values(), ensure_ascii=False)
@@ -92,9 +90,14 @@ class autoresponder:
                       f"Если считаешь, что вопрос следует отклонить, верни строку REJECTED. При необходимости - импровизируй. "
                       f"Если считаешь, что ты не попал в суть вопроса с вероятностью 1/2, то в конце ответа поставь 2 символа *. Если не уверен, что стоит отклонить - не отклоняй."
                       f"Вот вопрос: {obj.text}")
-            data = ask_gpt(prompt).json()
-            reply = data["choices"][0]["message"]["content"]
-            print(reply)
+            resp = all_requests.ask_gpt(prompt)
+
+        data = resp.json()
+        choices = data["choices"]
+        reply = choices[0]["messege"]["content"] if (resp.ok and choices and choices[0]["message"].get("content")) else ""
+        if not reply:
+            print(f"[WARN] GPT empty reply: {data}")
+            all_requests.debug_print_json(resp)
         return reply
 
 
@@ -108,17 +111,18 @@ class autoresponder:
 
     def _append_rows_bulk(self, name_sheet: str, rows: list[list]):
         ws = self.sh.worksheet(name_sheet)
-        ws.append_rows(rows, value_input_option="RAW")  # noqa
-
+        ws.append_rows(rows, value_input_option=ValueInputOption.raw)  # noqa
 
     def update_feedbacks(self):
         rows_to_write = []
         feedbacks = self._get_feedbacks()
         for fb in feedbacks.itertuples():
             reply = self._compose_reply(fb)
+            if not reply:
+                continue
             check = self._send_reply(fb, reply)
             if check:
-                rows_to_write.append([fb.text, fb.date, fb.mark, reply])
+                rows_to_write.append([fb.text, fb.date, fb.mark, reply])  # noqa
         if rows_to_write:
             self._append_rows_bulk("Отзывы", rows_to_write)
 
@@ -128,9 +132,11 @@ class autoresponder:
         questions = self._get_questions()
         for q in questions.itertuples():
             reply = self._compose_reply(q)
+            if not reply:
+                continue
             check = self._send_reply(q, reply)
             if check:
-                rows_to_write.append([q.text, q.date, reply])
+                rows_to_write.append([q.text, q.date, reply])  # noqa
         if rows_to_write:
             self._append_rows_bulk("Вопросы", rows_to_write)
 

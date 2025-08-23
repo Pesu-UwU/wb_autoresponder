@@ -12,8 +12,12 @@ MAX_RETRIES = 3
 TIMEOUT = 60
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-def print_json(resp: requests.Response):
-    print(json.dumps(resp.json(), indent=4, ensure_ascii=False))
+def debug_print_json(resp: requests.Response):
+    try:
+        payload = resp.json()
+        print(json.dumps(payload, indent=4, ensure_ascii=False))
+    except Exception:
+        print(resp.text[:1000])  # кусок сырого текста
 
 def _request(
     method: str,
@@ -28,14 +32,15 @@ def _request(
         #if (method == "POST" and resp.status_code == 204) or (method in ("GET", "PATCH") and resp.ok):
         if resp.ok:
             print(f"[INFO] HTTP {method} {url} OK ({resp.status_code})")
-            time.sleep(retry)
+            if retry > 0:
+                time.sleep(retry)
             return resp
         print(f"[WARN] HTTP {method} {url} -> {resp.status_code} "
               f"(attempt {attempt}/{MAX_RETRIES}). Retry in {ERROR_SLEEP_TIME}s")
-        print_json(resp)
+        debug_print_json(resp)
         time.sleep(ERROR_SLEEP_TIME)
     # последняя попытка: вернём как есть
-    return resp
+    return resp  # noqa
 
 
 def get_feedbacks(token, isAnswered, take, skip):
@@ -183,6 +188,3 @@ def ask_gpt(prompt: str, model: str = "gpt-4o-mini"):
 #             break
 #     print(f"Requests send_reply_question: {result.status_code} STOP")
 #     return result
-
-def get_ans_gpt():
-    gpt_token = os.getenv("GPT_TOKEN")
