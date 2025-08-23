@@ -107,7 +107,7 @@ class autoresponder:
 
     def _append_rows_bulk(self, name_sheet: str, rows: list[list]):
         ws = self.sh.worksheet(name_sheet)
-        ws.append_rows(rows, value_input_option=ValueInputOption.raw)
+        ws.append_rows(rows, value_input_option="RAW")  # noqa
 
 
     def update_feedbacks(self):
@@ -115,8 +115,8 @@ class autoresponder:
         feedbacks = self._get_feedbacks()
         for fb in feedbacks.itertuples():
             reply = self._compose_reply(fb)
-            rows_to_write.append([fb.text, fb.date, fb.mark, reply])
             self._send_reply(fb, reply)
+            rows_to_write.append([fb.text, fb.date, fb.mark, reply])
         if rows_to_write:
             self._append_rows_bulk("Отзывы", rows_to_write)
 
@@ -126,15 +126,15 @@ class autoresponder:
         questions = self._get_questions()
         for q in questions.itertuples():
             reply = self._compose_reply(q)
+            #self._send_reply(q, reply)
             rows_to_write.append([q.text, q.date, reply])
-            self._send_reply(q, reply)
         if rows_to_write:
             self._append_rows_bulk("Вопросы", rows_to_write)
 
 
 
     def start_autoresponder(self):
-        self.update_feedbacks()
+        #self.update_feedbacks()
         self.update_questions()
 
 
