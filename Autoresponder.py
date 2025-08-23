@@ -9,7 +9,6 @@ from typing import Dict, List
 from dotenv import load_dotenv
 
 import all_requests
-#from all_requests import ask_gpt
 
 load_dotenv()
 
@@ -93,7 +92,7 @@ class Autoresponder:
             resp = all_requests.ask_gpt(prompt)
 
         data = resp.json()
-        choices = data["choices"]
+        choices = data.get("choices")
         reply = choices[0]["messege"]["content"] if (resp.ok and choices and choices[0]["message"].get("content")) else ""
         if not reply:
             print(f"[WARN] GPT empty reply: {data}")
