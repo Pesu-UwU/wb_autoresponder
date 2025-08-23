@@ -93,7 +93,7 @@ class Autoresponder:
 
         data = resp.json()
         choices = data.get("choices")
-        reply = choices[0]["messege"]["content"] if (resp.ok and choices and choices[0]["message"].get("content")) else ""
+        reply = choices[0]["message"]["content"] if (resp.ok and choices and choices[0]["message"].get("content")) else ""
         if not reply:
             print(f"[WARN] GPT empty reply: {data}")
             all_requests.debug_print_json(resp)
