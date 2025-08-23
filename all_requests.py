@@ -56,7 +56,7 @@ def send_reply_feedback(token, id, reply):
         {"id": id, "text": reply},
     )
 
-def get_quastions(token, isAnswered, take, skip):  # можно переименовать на get_questions (API сохраните)
+def get_questions(token, isAnswered, take, skip):  # можно переименовать на get_questions (API сохраните)
     return _request(
         "GET",
         "https://feedbacks-api.wildberries.ru/api/v1/questions",

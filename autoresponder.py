@@ -2,6 +2,7 @@ import json
 import os
 
 import gspread
+from gspread.utils import ValueInputOption
 import pandas as pd
 from typing import Dict, Any, List
 
@@ -24,7 +25,7 @@ class autoresponder:
         self.gc = gspread.service_account(filename="credentials.json")
         self.sh = self.gc.open_by_key(key_table)
 
-    def feedback(self) -> pd.DataFrame:
+    def _get_feedbacks(self) -> pd.DataFrame:
         rows: List[Dict] = []
 
         take = 5000
@@ -47,17 +48,17 @@ class autoresponder:
                     })
         return pd.DataFrame(rows, columns=["id", "text", "date", "mark", "user_name"])
 
-    def question(self) -> pd.DataFrame:
+    def _get_questions(self) -> pd.DataFrame:
         rows: List[Dict] = []
 
         take = 10000
-        res = all_requests.get_quastions(self.wb_token, "true", take, 0)
+        res = all_requests.get_questions(self.wb_token, "true", take, 0)
         cnt_false = res["data"]["countUnanswered"]
         print(cnt_false)
 
         n = int((cnt_false + take - 1) / take)
         for coef in range(n):
-            res = all_requests.get_quastions(self.wb_token, "false", take, coef * take)
+            res = all_requests.get_questions(self.wb_token, "false", take, coef * take)
             for q in res["data"]["questions"]:
                 if q.get("state") == "suppliersPortalSynch":  # только новые запросы без отклоненных
                     print(q["text"])
@@ -69,7 +70,7 @@ class autoresponder:
         return pd.DataFrame(rows, columns=["id", "text", "date"])
 
 
-    def compose_reply(self, obj) -> str: #  будет генериться с помощью api gpt
+    def _compose_reply(self, obj) -> str: #  будет генериться с помощью api gpt
         reply = ""
         if hasattr(obj, "mark"):
             prompt = (f"Ты продавец товара на маркетплейсе Wildberries. Тебе нужно ответить на отзыв покупателя по следующим шаблонам. Ответы к положительным комментариям (оценка: больше или равна 4):"
@@ -85,12 +86,9 @@ class autoresponder:
         else:
             sh = self.gc.open_by_key(GOOGLE_TABLE_KEY_DATA_OF_PATTERNS).worksheet("1 Вариант")
             data = json.dumps(sh.get_all_values(), ensure_ascii=False)
-            #data = "" + "\n".join(sh.get_all_values())
-            # print(data)
-            # exit(0)
 
             prompt = (f"Ты продавец товара на маркетплейсе Wildberries. Тебе нужно ответить на отзыв покупателя по следующим шаблонам. Данные будут в виде JSON. "
-                      f"Если отсутствует ответ на вопрос, значит ответом является последний встретившийся. Шаблоны: {data}. "
+                      f"Если отсутствует ответ на вопрос, значит верным ответом является последний встретившийся. Шаблоны: {data}. "
                       f"Если считаешь, что вопрос следует отклонить, верни строку Отклонено. При необходимости - импровизируй. "
                       f"Если считаешь, что ты не попал в суть вопроса с вероятностью 1/2, то в конце ответа поставь 2 символа *"
                       f"Вот вопрос: {obj.text}")
@@ -100,29 +98,36 @@ class autoresponder:
         return reply
 
 
-    def send_reply(self, obj, reply: str):
+    def _send_reply(self, obj, reply: str):
         if hasattr(obj, "mark"):
             all_requests.send_reply_feedback(self.wb_token, obj.id, reply)
-            worksheet = self.sh.worksheet("Отзывы")
-            worksheet.append_row([obj.text, obj.date, obj.mark, reply])
         else:
             state = "none" if reply == "Отклонено" else "wbRu"
-            #all_requests.send_reply_question(self.wb_token, obj.id, reply, state)
-            worksheet = self.sh.worksheet("Вопросы")
-            worksheet.append_row([obj.text, obj.date, reply])
+            all_requests.send_reply_question(self.wb_token, obj.id, reply, state)
+
+    def _append_rows_bulk(self, name_sheet: str, rows: list[list]):
+        ws = self.sh.worksheet(name_sheet)
+        ws.append_rows(rows, value_input_option=ValueInputOption.RAW)  # noqa
 
 
     def update_feedbacks(self):
-        feedbacks = self.feedback()
+        rows_to_write = []
+        feedbacks = self._get_feedbacks()
         for fb in feedbacks.itertuples():
-            reply = self.compose_reply(fb)
-            self.send_reply(fb, reply)
+            reply = self._compose_reply(fb)
+            rows_to_write.append([fb.text, fb.date, fb.mark, reply])
+            self._send_reply(fb, reply)
+        self._append_rows_bulk("Отзывы", rows_to_write)
+
 
     def update_questions(self):
-        questions = self.question()
+        rows_to_write = []
+        questions = self._get_questions()
         for q in questions.itertuples():
-            reply = self.compose_reply(q)
-            self.send_reply(q, reply)
+            reply = self._compose_reply(q)
+            rows_to_write.append([q.text, q.date, reply])
+            self._send_reply(q, reply)
+        self._append_rows_bulk("Вопросы", rows_to_write)
 
 
 
