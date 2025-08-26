@@ -9,7 +9,7 @@ load_dotenv()
 
 ERROR_SLEEP_TIME = 60
 MAX_RETRIES = 3
-TIMEOUT = 60
+TIMEOUT = 30
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 def debug_print_json(resp: requests.Response):
@@ -24,22 +24,36 @@ def _request(
     url: str,
     headers: Dict[str, str],
     retry: float,
-    params: Optional[Any] = None,   # query-параметры в URL
-    json: Optional[Any] = None      # JSON-тело запроса
-) -> requests.Response:
+    params: Optional[Any] = None,
+    json: Optional[Any] = None
+) -> Optional[requests.Response]:
+    session = requests.Session()  # чтобы коннекты переиспользовались
     for attempt in range(1, MAX_RETRIES + 1):
-        resp = requests.request(method, url, headers=headers, params=params, json=json, timeout=TIMEOUT)
-        #if (method == "POST" and resp.status_code == 204) or (method in ("GET", "PATCH") and resp.ok):
+        try:
+            resp = session.request(
+                method, url, headers=headers, params=params, json=json, timeout=TIMEOUT
+            )
+        except requests.exceptions.Timeout as e:
+            print(f"[WARN] HTTP {method} {url} TIMEOUT "
+                  f"(attempt {attempt}/{MAX_RETRIES}). Retry in {ERROR_SLEEP_TIME}s")
+            time.sleep(ERROR_SLEEP_TIME)
+            continue
+        except requests.exceptions.RequestException as e:
+            print(f"[ERROR] HTTP {method} {url} FAILED: {e}")
+            return None  # фатальная ошибка, не будем ретраить
+
         if resp.ok:
             print(f"[INFO] HTTP {method} {url} OK ({resp.status_code})")
             if retry > 0:
                 time.sleep(retry)
             return resp
+
         print(f"[WARN] HTTP {method} {url} -> {resp.status_code} "
               f"(attempt {attempt}/{MAX_RETRIES}). Retry in {ERROR_SLEEP_TIME}s")
         debug_print_json(resp)
         time.sleep(ERROR_SLEEP_TIME)
-    # последняя попытка: вернём как есть
+
+    # последняя попытка: вернём что есть
     return resp  # noqa
 
 
@@ -58,7 +72,7 @@ def send_reply_feedback(token, id, reply):
         "https://feedbacks-api.wildberries.ru/api/v1/feedbacks/answer",
         {"Authorization": token, "Content-Type": "application/json"},
         0.4,
-        {"id": id, "text": reply},
+        json= {"id": id, "text": reply},
     )
 
 def get_questions(token, isAnswered, take, skip):  # можно переименовать на get_questions (API сохраните)
@@ -88,7 +102,7 @@ def ask_gpt(prompt: str, model: str = "gpt-4o-mini"):
         json = {
             "model": model,
             "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.7,
+            "temperature": 0.6,  # 0.7 - базовое значение
         }
     )
 

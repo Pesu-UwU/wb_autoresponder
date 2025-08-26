@@ -39,15 +39,31 @@ class Autoresponder:
         for coef in range(n):
             res = all_requests.get_feedbacks(self.wb_token, "false", take, coef * take).json()
             for fb in res["data"]["feedbacks"]:
-                text = fb["text"]
+                total_text = ""
+                text = fb["text"]  # комментарий
+                pros = fb["pros"]  # преимущества
+                cons = fb["cons"]  # недостатки
+                bables = fb["bables"]  # теги
+                if pros:
+                    total_text += f"Преимущества: {pros}\n"
+                if cons:
+                    total_text += f"Недостатки: {cons}\n"
                 if text:
-                    rows.append({
-                        "id": fb["id"],
-                        "text": text,
-                        "date": fb["createdDate"],
-                        "mark": fb["productValuation"],
-                        "user_name": fb["userName"]
-                    })
+                    total_text += f"Комментарий: {text}\n"
+                if bables:
+                    total_text += f"Теги: {bables}\n"
+                if fb["photoLinks"] or fb["video"]:
+                    total_text += "Приложены фото или видео\n"
+                if total_text[-1] == "\n":
+                    total_text = total_text[:-1]
+                rows.append({
+                    "id": fb["id"],
+                    "text": total_text,
+                    "date": fb["createdDate"],
+                    "mark": fb["productValuation"],
+                    "user_name": fb["userName"]
+                })
+
         return pd.DataFrame(rows, columns=["id", "text", "date", "mark", "user_name"])
 
     def _get_questions(self) -> pd.DataFrame:
@@ -63,7 +79,7 @@ class Autoresponder:
             res = all_requests.get_questions(self.wb_token, "false", take, coef * take).json()
             for q in res["data"]["questions"]:
                 if q["state"] == "suppliersPortalSynch":  # только новые запросы без отклоненных
-                    print(q["text"])
+                    print(q["text"])  #ВЫВОД
                     rows.append({
                         "id": q["id"],
                         "text": q["text"],
@@ -140,6 +156,7 @@ class Autoresponder:
             if not reply:
                 continue
             check = self._send_reply(fb, reply)
+            exit(0)
             if check:
                 rows_to_write.append([fb.text, fb.date, fb.mark, reply])  # noqa
         if rows_to_write:
@@ -151,6 +168,7 @@ class Autoresponder:
         questions = self._get_questions()
         for q in questions.itertuples():
             reply = self._compose_reply(q)
+            exit(0)
             if not reply:
                 continue
             check = self._send_reply(q, reply)
@@ -163,6 +181,6 @@ class Autoresponder:
 
     def start_autoresponder(self):
         self.update_feedbacks()
-        self.update_questions()
+        #self.update_questions()
 
 
