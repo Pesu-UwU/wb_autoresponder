@@ -92,7 +92,7 @@ class Autoresponder:
         return pd.DataFrame(rows, columns=["id", "text", "date_q"])
 
     def _get_char(self):
-        char = Dict[str, Dict[str, str]] = {}
+        char: Dict[str, Dict[str, str]] = {}
         limit = 100
         nm_id = None
         updated_at = None
@@ -102,7 +102,7 @@ class Autoresponder:
             if total_cnt == 0: break
             for card in result["cards"]:
                 try:
-                    char.update({"nm_id": {"subject_name": card["subjectName"], "title": card["title"], "description": card["description"]}})
+                    char.update({card["nmId"]: {"subject_name": card["subjectName"], "title": card["title"], "description": card["description"]}})
                 except Exception:
                     continue
             if total_cnt < limit:
@@ -123,7 +123,7 @@ class Autoresponder:
                       f"Отвечай на отзывы покупателей в их стиле (коротко/подробно, сухо/эмоционально), но всегда вежливо и делово. "
                       f"На негативные отзывы реагируй спокойно: поблагодари за обратную связь, дай нейтральный комментарий и предложи альтернативу. "
                       f"В каждом ответе в конце обязательно рекомендуй схожий товар из ассортимента. Для этого используй JSON со списком товаров. Найди в нем похожий товар (по типу и характеристикам: рукав, сезонность, материал и т.п.). "
-                      f"Если нет точного совпадения, выбери ближайшую альтернативу. Артикул - это поле nm_id, название - title. Добавь рекомендацию в формате: «Рекомендуем также обратить внимание на нашу модель: [название] (артикул: XXXXX)». Данные бери из этого json: {self.char}"
+                      f"Если нет точного совпадения, выбери ближайшую альтернативу. Артикул - это последовательность цифр, по которому ты видишь поля, соответствующие его названию - title, объекту - subject_name и описания - description. Добавь рекомендацию в формате: «Рекомендуем также обратить внимание на нашу модель: [название] (артикул: XXXXX)». Данные бери из этого json: {json.dumps(self.char, ensure_ascii=False)}"
                       f"Текст отзыва: {obj.text}, оценка отзыва: {obj.mark}, имя клиента: {obj.user_name}, артикул купленного товара (чтобы ты случайно не порекомендовал его же): {obj.nm_id}, тип товара: {obj.subject_name}"
                       f" Если у пользователя есть нормальное имя, то обратись к нему по имени. Избегай в своей речи взываний к дополнительным вопросам и слова")
             resp = all_requests.ask_gpt(prompt)
