@@ -1,3 +1,4 @@
+import datetime
 import json
 import os
 import time
@@ -59,12 +60,14 @@ class Autoresponder:
                 rows.append({
                     "id": fb["id"],
                     "text": total_text,
-                    "date": fb["createdDate"],
+                    "date_fb": fb["createdDate"],
                     "mark": fb["productValuation"],
-                    "user_name": fb["userName"]
+                    "user_name": fb["userName"],
+                    "subject_name":  fb["subjectName"],
+                    "nm_id": fb["productDetails"]["nmId"]
                 })
 
-        return pd.DataFrame(rows, columns=["id", "text", "date", "mark", "user_name"])
+        return pd.DataFrame(rows, columns=["id", "text", "date_fb", "mark", "user_name", "subject_name", "nm_id"])
 
     def _get_questions(self) -> pd.DataFrame:
         rows: List[Dict] = []
@@ -83,9 +86,12 @@ class Autoresponder:
                     rows.append({
                         "id": q["id"],
                         "text": q["text"],
-                        "date": q["createdDate"],
+                        "date_q": q["createdDate"],
                     })
-        return pd.DataFrame(rows, columns=["id", "text", "date"])
+        return pd.DataFrame(rows, columns=["id", "text", "date_q"])
+
+    def _get_char(self):
+
 
 
     def _compose_reply(self, obj) -> str: #  будет генериться с помощью api gpt
@@ -151,14 +157,18 @@ class Autoresponder:
     def update_feedbacks(self):
         rows_to_write = []
         feedbacks = self._get_feedbacks()
+        i = 1
         for fb in feedbacks.itertuples():
+            if i == 100 :
+                break
             reply = self._compose_reply(fb)
             if not reply:
                 continue
+            date_ans = datetime.datetime.now()
             check = self._send_reply(fb, reply)
-            exit(0)
             if check:
-                rows_to_write.append([fb.text, fb.date, fb.mark, reply])  # noqa
+                rows_to_write.append([fb.nm_id, fb.date_fb, fb.text, fb.mark, reply, date_ans])  # noqa
+            i += 1
         if rows_to_write:
             self._append_rows_bulk("Отзывы", rows_to_write)
 
@@ -173,13 +183,15 @@ class Autoresponder:
                 continue
             check = self._send_reply(q, reply)
             if check:
-                rows_to_write.append([q.text, q.date, reply])  # noqa
+                rows_to_write.append([q.text, q.date_q, reply])  # noqa
         if rows_to_write:
             self._append_rows_bulk("Вопросы", rows_to_write)
 
 
 
     def start_autoresponder(self):
+        all_requests.debug_print_json(all_requests.get_cards(self.wb_token))
+        exit(0)
         self.update_feedbacks()
         #self.update_questions()
 

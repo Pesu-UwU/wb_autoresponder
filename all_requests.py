@@ -106,7 +106,26 @@ def ask_gpt(prompt: str, model: str = "gpt-4o-mini"):
         }
     )
 
-#def charac(token,)
+def get_cards(token):
+    return _request(
+        "POST",
+        "https://content-api.wildberries.ru/content/v2/get/cards/list",
+        {"Authorization": token, "Content-Type": "application/json"},
+        0.4,
+        json= {
+          "settings": {
+            "cursor": {
+              "limit": 100
+            },
+              "sort": {
+                  "ascending": False
+              },
+              "filter": {
+                      "textSearch": "453813871"
+                  }
+          }
+        }
+    )
 
 # def get_feedback(token, isAnswered, take, skip):
 #     url = "https://feedbacks-api.wildberries.ru/api/v1/feedbacks"
