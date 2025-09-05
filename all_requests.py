@@ -22,6 +22,8 @@ def debug_print_json(resp: requests.Response):
 def debug_print_dict(dictionary):
     print(json.dumps(dictionary, indent=4, ensure_ascii=False))
 
+SESSION = requests.Session()  # чтобы коннекты переиспользовались
+
 def _request(
     method: str,
     url: str,
@@ -30,10 +32,10 @@ def _request(
     params: Optional[Any] = None,
     json: Optional[Any] = None
 ) -> Optional[requests.Response]:
-    session = requests.Session()  # чтобы коннекты переиспользовались
+    #session = requests.Session()
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            resp = session.request(
+            resp = SESSION.request(
                 method, url, headers=headers, params=params, json=json, timeout=TIMEOUT
             )
         except requests.exceptions.Timeout as e:
