@@ -91,6 +91,25 @@ class Autoresponder:
         return pd.DataFrame(rows, columns=["id", "text", "date_q"])
 
     def _get_char(self):
+        char = Dict[str, Dict[str, str]]
+        limit = 100
+        nm_id = None
+        updated_at = None
+        while True:
+            result = all_requests.get_cards(self.wb_token, limit, nm_id, updated_at).json()
+            total_cnt = result["cursor"]["total"]
+            if total_cnt == 0: break
+            for card in result["cards"]:
+                try:
+                    char.update({"nm_id": {"subject_name": card["subjectName"], "title": card["title"], "description": card["description"]}})
+                except Exception:
+                    continue
+            if total_cnt < limit:
+                break
+            nm_id = result["cursor"]["nmId"]
+            updated_at = result["cursor"]["updatedAt"]
+        all_requests.debug_print_dict(char)
+        return char
 
 
 
@@ -190,7 +209,7 @@ class Autoresponder:
 
 
     def start_autoresponder(self):
-        all_requests.debug_print_json(all_requests.get_cards(self.wb_token))
+        char = self._get_char()
         exit(0)
         self.update_feedbacks()
         #self.update_questions()

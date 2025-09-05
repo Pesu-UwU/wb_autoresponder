@@ -19,6 +19,9 @@ def debug_print_json(resp: requests.Response):
     except Exception:
         print(resp.text[:1000])  # кусок сырого текста
 
+def debug_print_dict(dictionary):
+    print(json.dumps(dictionary, indent=4, ensure_ascii=False))
+
 def _request(
     method: str,
     url: str,
@@ -106,24 +109,23 @@ def ask_gpt(prompt: str, model: str = "gpt-4o-mini"):
         }
     )
 
-def get_cards(token):
+def get_cards(token, limit, nm_id: str = None, updated_at: str = None):
     return _request(
         "POST",
         "https://content-api.wildberries.ru/content/v2/get/cards/list",
         {"Authorization": token, "Content-Type": "application/json"},
         0.4,
         json= {
-          "settings": {
-            "cursor": {
-              "limit": 100
-            },
-              "sort": {
-                  "ascending": False
-              },
-              "filter": {
-                      "textSearch": "453813871"
-                  }
-          }
+            "settings": {
+                "cursor": {
+                    "limit": limit,
+                    "nmId": nm_id,
+                    "updatedAt": updated_at
+                },
+                "sort": {
+                    "ascending": False
+                },
+            }
         }
     )
 
