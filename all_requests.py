@@ -112,6 +112,12 @@ def ask_gpt(prompt: str, model: str = "gpt-4o-mini"):
     )
 
 def get_cards(token, limit, nm_id: str = None, updated_at: str = None):
+    cursor = {"limit": limit}
+    if nm_id is not None:
+        cursor["nmID"] = nm_id
+    if updated_at is not None:
+        cursor["updatedAt"] = updated_at
+
     return _request(
         "POST",
         "https://content-api.wildberries.ru/content/v2/get/cards/list",
@@ -119,11 +125,7 @@ def get_cards(token, limit, nm_id: str = None, updated_at: str = None):
         0.4,
         json= {
             "settings": {
-                "cursor": {
-                    "limit": limit,
-                    "nmId": nm_id,
-                    "updatedAt": updated_at
-                },
+                "cursor": cursor,
                 "sort": {
                     "ascending": False
                 },

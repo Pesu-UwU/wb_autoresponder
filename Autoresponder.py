@@ -97,17 +97,19 @@ class Autoresponder:
         nm_id = None
         updated_at = None
         while True:
-            result = all_requests.get_cards(self.wb_token, limit, nm_id, updated_at).json()
+            result = all_requests.get_cards(self.wb_token, limit, nm_id, updated_at)
+            #all_requests.debug_print_json(result)
+            result=result.json()
             total_cnt = result["cursor"]["total"]
             if total_cnt == 0: break
             for card in result["cards"]:
                 try:
-                    char.update({card["nmId"]: {"subject_name": card["subjectName"], "title": card["title"], "description": card["description"]}})
+                    char.update({card["nmID"]: {"subject_name": card["subjectName"], "title": card["title"], "description": card["description"]}})
                 except Exception:
                     continue
             if total_cnt < limit:
                 break
-            nm_id = result["cursor"]["nmId"]
+            nm_id = result["cursor"]["nmID"]
             updated_at = result["cursor"]["updatedAt"]
         all_requests.debug_print_dict(char)
         return char
