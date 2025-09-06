@@ -27,7 +27,7 @@ class Autoresponder:
         self.wb_token = wb_token
         self.gc = gspread.service_account(filename="credentials.json")
         self.sh = self.gc.open_by_key(key_table)
-        self.char = self._get_char()
+        self.characteristics = {}
 
     def _get_feedbacks(self) -> pd.DataFrame:
         rows: List[Dict] = []
@@ -65,10 +65,11 @@ class Autoresponder:
                     "mark": fb["productValuation"],
                     "user_name": fb["userName"],
                     "subject_name":  fb["subjectName"],
-                    "nm_id": fb["productDetails"]["nmId"]
+                    "nm_id": fb["productDetails"]["nmId"],
+                    "supplier_article": fb["productDetails"]["supplierArticle"]
                 })
 
-        return pd.DataFrame(rows, columns=["id", "text", "date_fb", "mark", "user_name", "subject_name", "nm_id"])
+        return pd.DataFrame(rows, columns=["id", "text", "date_fb", "mark", "user_name", "subject_name", "nm_id", "supplier_article"])
 
     def _get_questions(self) -> pd.DataFrame:
         rows: List[Dict] = []
@@ -91,8 +92,8 @@ class Autoresponder:
                     })
         return pd.DataFrame(rows, columns=["id", "text", "date_q"])
 
-    def _get_char(self):
-        char: Dict[str, Dict[str, str]] = {}
+    def _get_characteristics(self):
+        characteristics: Dict[str, Dict[str, str]] = {}
         limit = 100
         nm_id = None
         updated_at = None
@@ -103,31 +104,23 @@ class Autoresponder:
             total_cnt = result["cursor"]["total"]
             if total_cnt == 0: break
             for card in result["cards"]:
-                try:
-                    char.update({card["nmID"]: {"subject_name": card["subjectName"], "title": card["title"], "description": card["description"]}})
-                except Exception:
-                    continue
+                nm_id = card["nmID"]
+                characteristics.update({nm_id: {"subject_name": card["subjectName"], "title": card["title"]}})
+                for characteristic in card["characteristics"]:
+                    characteristics[nm_id].update({characteristic["name"]: characteristic["value"]})
             if total_cnt < limit:
                 break
             nm_id = result["cursor"]["nmID"]
             updated_at = result["cursor"]["updatedAt"]
-        all_requests.debug_print_dict(char)
-        return char
+        #all_requests.debug_print_dict(characteristics)
+        return characteristics
 
 
 
     def _compose_reply(self, obj) -> str: #  будет генериться с помощью api gpt
         if hasattr(obj, "mark"):
-            prompt = (f"Ты автоответчик продавца товара на маркетплейсе Wildberries. Тебе нужно ответить на отзыв покупателя следующим образом. Если в тексте указаны только теги, то ответь шаблонно. Ответ к положительным комментариям (оценка: больше или равна 4):"
-                      f"[Здравствуйте, Надежда! Мы ценим и уважаем каждого клиента. Благодарим за положительный отзыв.\nС уважением, представители бренда!]."
-                      f"Ответы к негативному отзыву: "
-                      f"[Здраствуйте, Марина! Благодарим Вас за обратную связь. Нам искренне жаль, что Вы разочарованы покупкой.\nС уважением, представители бренда!]."
-                      f"Отвечай на отзывы покупателей в их стиле (коротко/подробно, сухо/эмоционально), но всегда вежливо и делово. "
-                      f"На негативные отзывы реагируй спокойно: поблагодари за обратную связь, дай нейтральный комментарий и предложи альтернативу. "
-                      f"В каждом ответе в конце обязательно рекомендуй схожий товар из ассортимента. Для этого используй JSON со списком товаров. Найди в нем похожий товар (по типу и характеристикам: рукав, сезонность, материал и т.п.). "
-                      f"Если нет точного совпадения, выбери ближайшую альтернативу. Артикул - это последовательность цифр, по которому ты видишь поля, соответствующие его названию - title, объекту - subject_name и описания - description. Добавь рекомендацию в формате: «Рекомендуем также обратить внимание на нашу модель: [название] (артикул: XXXXX)». Данные бери из этого json: {json.dumps(self.char, ensure_ascii=False)}"
-                      f"Текст отзыва: {obj.text}, оценка отзыва: {obj.mark}, имя клиента: {obj.user_name}, артикул купленного товара (чтобы ты случайно не порекомендовал его же): {obj.nm_id}, тип товара: {obj.subject_name}"
-                      f" Если у пользователя есть нормальное имя, то обратись к нему по имени. Избегай в своей речи взываний к дополнительным вопросам и слова")
+            prompt = (f"""Ты — живой, человечный и немного ироничный ассистент бренда Wildberries. Ты отвечаешь на отзывы покупателей с маркетплейса (например, Wildberries). Твоя задача — создать по-настоящему живой, искренний, не шаблонный ответ на каждый отзыв. 
+            Тебе передаются: - {obj.text} — текст отзыва (возможно с тегами) - {obj.mark} — оценка (от 1 до 5) - {obj.user_name} — имя клиента - {obj.subject_name} — название основного товара (например, «Пижама») - {obj.nm_id} — артикул товара, о котором оставлен отзыв - {json.dumps(self.characteristics, ensure_ascii=False)} — словарь всех остальных наших товаров, в формате: {{ "456789": {{"title": "Шарф «Лесная дымка»", "color": "светло-серый", "subject_name": "Шарф",  }},  ... }} Твоя задача: 1. Ответить на отзыв (исходя из оценки и текста) — с человечностью, юмором, сочувствием или радостью. 2. Обязательно вставь рекомендацию одного из других товаров из characteristics. Выбери его так, чтобы он логично дополнял или мог заменить основной товар. 3. Упомяни: - Название рекомендованного товара; - Коротко, зачем он может подойти (в контексте отзыва); - Упомяни его артикул (nm_id); - Не пиши «у нас есть» — пиши, как будто это совет от друга: «А вот, кстати, есть вещь, которая может классно зайти — это ___, арт. ___». Важно: - Не используй шаблонов. Каждый ответ должен быть уникальным по структуре и стилю. - Если отзыв негативный — не оправдывайся, поблагодари за честность, посочувствуй, предложи альтернативу. - Если отзыв позитивный — порадоваться вместе, можно пошутить, добавить рекомендацию как бонус. - В рекомендацию обязательно вплети артикул: «арт. 456789» — но деликатно. - Не используй сухих фраз вроде «рекомендуем вам посмотреть». Примеры рекомендаций: - «Кстати, есть ещё шарф «Лесная дымка» (арт. 456789) — он такой уютный, что даже плохое настроение не пристаёт.» - «Если хочется чего-то потеплее — присмотритесь к комплекту с артикулом 987654. Он объятие, а не пижама.» - «Есть, между прочим, ещё одна находка — шарф “Пыльная роза” (арт. 112233). Может идеально дополнить ваш стиль.» Пиши от лица бренда Wildberries, как будто ты человек, а не бот. Будь стильным, лёгким, тёплым. И не забывай об артикуле рекомендованного товара.""")
             resp = all_requests.ask_gpt(prompt)
         else:
             sh = self.gc.open_by_key(GOOGLE_TABLE_KEY_DATA_OF_PATTERNS).worksheet("1 Вариант")
@@ -150,6 +143,7 @@ class Autoresponder:
         if not reply:
             print(f"[WARN] GPT empty reply: {data}")
             all_requests.debug_print_json(resp)
+        print(f"[GPT] given text: {obj.text}")
         print(f"[GPT] reply: {reply}")
         return reply
 
@@ -181,17 +175,19 @@ class Autoresponder:
     def update_feedbacks(self):
         rows_to_write = []
         feedbacks = self._get_feedbacks()
-        i = 1
+        i = 0
         for fb in feedbacks.itertuples():
-            if i == 100 :
+            if i == 10:
                 break
             reply = self._compose_reply(fb)
+            #exit(0)
             if not reply:
                 continue
-            date_ans = datetime.datetime.now()
-            check = self._send_reply(fb, reply)
-            if check:
-                rows_to_write.append([fb.nm_id, fb.date_fb, fb.text, fb.mark, reply, date_ans])  # noqa
+            date_ans = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            #check = self._send_reply(fb, reply)
+            # if check:
+            #     rows_to_write.append([fb.supplier_article, fb.date_fb, fb.mark, fb.text, reply, date_ans])  # noqa
+            rows_to_write.append([fb.supplier_article, fb.date_fb, fb.mark, fb.text, reply, date_ans])  # noqa
             i += 1
         if rows_to_write:
             self._append_rows_bulk("Отзывы", rows_to_write)
@@ -214,8 +210,10 @@ class Autoresponder:
 
 
     def start_autoresponder(self):
-        char = self._get_char()
-        exit(0)
+        #all_requests.debug_print_json(all_requests.get_cards_trash(self.wb_token, 100))
+        self.characteristics = self._get_characteristics()
+        #exit(0)
+        #all_requests.debug_print_dict(self.characteristics)
         self.update_feedbacks()
         #self.update_questions()
 

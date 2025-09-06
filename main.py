@@ -55,7 +55,7 @@ def all_start_to_user():
 
 def main():
     all_start_to_user()
-    schedule.every(5).minutes.do(all_start_to_user)
+    schedule.every(30).minutes.do(all_start_to_user)
     while True:
         schedule.run_pending()
         time.sleep(1)

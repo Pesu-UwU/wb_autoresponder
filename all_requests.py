@@ -123,12 +123,41 @@ def get_cards(token, limit, nm_id: str = None, updated_at: str = None):
         "https://content-api.wildberries.ru/content/v2/get/cards/list",
         {"Authorization": token, "Content-Type": "application/json"},
         0.4,
+        {"locale": "ru"},
+        json= {
+            "settings": {
+                "sort": {
+                    "ascending": True
+                },
+                "filter": {
+                    "withPhoto": 1
+                },
+                "cursor": cursor
+            }
+        }
+    )
+
+def get_cards_trash(token, limit, nm_id: str = None, trashed_at: str = None):
+    cursor = {"limit": limit}
+    if nm_id is not None:
+        cursor["nmID"] = nm_id
+    if trashed_at is not None:
+        cursor["trashedAt"] = trashed_at
+
+    return _request(
+        "POST",
+        "https://content-api.wildberries.ru/content/v2/get/cards/trash",
+        {"Authorization": token, "Content-Type": "application/json"},
+        0.4,
         json= {
             "settings": {
                 "cursor": cursor,
                 "sort": {
-                    "ascending": False
+                    "ascending": True
                 },
+                "filter": {
+                    "allowedCategoriesOnly": False
+                }
             }
         }
     )
