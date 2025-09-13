@@ -200,7 +200,7 @@ class Autoresponder:
             print(f"[WARN] Failed to send reply for id={obj.id}, status={resp.status_code}")
         return resp.ok
 
-    def _append_rows_bulk(self, name_sheet: str, rows: list[list]):
+    def _append_rows_bulk_bottom(self, name_sheet: str, rows: list[list]):
         for attempt in range(1, MAX_RETRIES + 1):
             try:
                 ws = self.sh.worksheet(name_sheet)
@@ -211,6 +211,24 @@ class Autoresponder:
                 print(f"[WARN] Failed to append rows to sheet '{name_sheet}' for {self.name}: {ex}")
                 time.sleep(ERROR_SLEEP_TIME)
 
+    def _append_rows_bulk_top(self, name_sheet: str, rows: list[list]):
+        if not rows:
+            return
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                ws = self.sh.worksheet(name_sheet)
+                # вставляем ПОД заголовок (строка 2) и в перевёрнутом порядке,
+                # чтобы первая новая запись оказалась выше остальных
+                ws.insert_rows(
+                    rows[::-1],  # <- РЕВЕРС важен, чтобы верхом шла последняя добавленная
+                    row=2,
+                    value_input_option=ValueInputOption.raw
+                )
+                print(f"[INFO] Prepended {len(rows)} rows to sheet '{name_sheet}' for {self.name}")
+                break
+            except Exception as ex:
+                print(f"[WARN] Failed to prepend rows to sheet '{name_sheet}' for {self.name}: {ex}")
+                time.sleep(ERROR_SLEEP_TIME)
 
     def update_feedbacks(self):
         rows_to_write = []
@@ -228,10 +246,10 @@ class Autoresponder:
             if check:
                rows_to_write.append([fb.supplier_article, fb.nm_id, fb.date_fb, fb.mark, fb.text, reply, date_ans])  # noqa
             #rows_to_write.append([fb.supplier_article, fb.nm_id, fb.date_fb, fb.mark, fb.text, reply, date_ans])  # noqa
-            #
+            i += 1
             if i == 1 and rows_to_write:
                 i = 0
-                self._append_rows_bulk("Отзывы", rows_to_write)
+                self._append_rows_bulk_top("Отзывы", rows_to_write)
                 rows_to_write = []
 
     def update_questions(self):
