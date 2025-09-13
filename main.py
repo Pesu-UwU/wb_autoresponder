@@ -13,6 +13,8 @@ from Autoresponder import Autoresponder
 
 TELEBOT_TOKEN = os.getenv("TELEBOT_TOKEN")
 bot = telebot.TeleBot(TELEBOT_TOKEN)
+table_data = os.getenv("TABLE_DATA")
+table_test_data = os.getenv("TABLE_TEST_DATA")
 
 class Update:
     def __init__(self, key_table, name, wb_token):
@@ -24,7 +26,7 @@ class Update:
 
 def get_clients() -> pd.DataFrame:
     gc = gspread.service_account(filename="credentials.json")
-    sh = gc.open_by_key("18L3gx1ps1p7fTHVCcte7tHjjW3PyLoJpD79TdMNkbOY")
+    sh = gc.open_by_key(table_data)
     data = sh.worksheet("data").get_all_values()
     df = pd.DataFrame(data[1:], columns=data[0])
     return df
