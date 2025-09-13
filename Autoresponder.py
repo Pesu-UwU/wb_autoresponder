@@ -233,8 +233,6 @@ class Autoresponder:
                 i = 0
                 self._append_rows_bulk("Отзывы", rows_to_write)
                 rows_to_write = []
-                #kdksfl
-
 
     def update_questions(self):
         rows_to_write = []
@@ -251,7 +249,6 @@ class Autoresponder:
             self._append_rows_bulk("Вопросы", rows_to_write)
 
 
-
     def start_autoresponder(self):
         #all_requests.debug_print_json(all_requests.get_cards_trash(self.wb_token, 100))
         self.characteristics = self._get_characteristics()
@@ -259,5 +256,3 @@ class Autoresponder:
         #all_requests.debug_print_dict(self.characteristics)
         self.update_feedbacks()
         #self.update_questions()
-
-
