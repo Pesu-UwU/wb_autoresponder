@@ -233,6 +233,7 @@ class Autoresponder:
                 i = 0
                 self._append_rows_bulk("Отзывы", rows_to_write)
                 rows_to_write = []
+                #kdksfl
 
 
     def update_questions(self):
