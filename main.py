@@ -43,15 +43,15 @@ def all_start_to_user():
                 name = row.name  # noqa
                 wb_token = row.wb_token  # noqa
                 key_table = row.key_table  # noqa
-                client = Update(key_table, name, wb_token)
-                #for j in range(3):
-                    # try:
-                client.start()
-                    #     bot.send_message("-1002417112074",f"✅GOOD SEND to USER\n name:{i.name}")
-                    #     break
-                    # except Exception as ex:
-                    #     bot.send_message("-1002417112074",f"ERROR ERROR ERROR TO USER \nname:{i.name}\nError: {ex}")
-                    #     time.sleep(120)
+                for j in range(3):
+                    try:
+                        client = Update(key_table, name, wb_token)
+                        client.start()
+                        bot.send_message("-1002417112074",f"✅GOOD SEND AUTORESPONDER to USER\n name:{name}")
+                        break
+                    except Exception as ex:
+                        bot.send_message("-1002417112074",f"ERROR ERROR ERROR AUTORESPONDER TO USER \nname:{name}\nError: {ex}")
+                        time.sleep(120)
 
 def main():
     all_start_to_user()

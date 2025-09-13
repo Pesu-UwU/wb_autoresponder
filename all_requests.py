@@ -107,7 +107,7 @@ def ask_gpt(prompt: str, model: str = "gpt-4o-mini"):
         json = {
             "model": model,
             "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.6,  # 0.7 - базовое значение
+            "temperature": 1,  # 0.7 - базовое значение
         }
     )
 
