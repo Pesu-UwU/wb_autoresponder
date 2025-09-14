@@ -49,11 +49,11 @@ def all_start_to_user():
                     try:
                         client = Update(key_table, name, wb_token)
                         client.start()
-                        bot.send_message("-1002417112074",f"✅GOOD SEND AUTORESPONDER to USER\n name:{name}")
+                        #bot.send_message("-1002417112074",f"✅GOOD SEND AUTORESPONDER to USER\n name:{name}")
                         break
                     except Exception as ex:
                         bot.send_message("-1002417112074",f"ERROR ERROR ERROR AUTORESPONDER TO USER \nname:{name}\nError: {ex}")
-                        time.sleep(120)
+                        time.sleep(300)
 
 def main():
     all_start_to_user()
