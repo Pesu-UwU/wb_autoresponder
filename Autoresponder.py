@@ -104,6 +104,8 @@ class Autoresponder:
             total_cnt = result["cursor"]["total"]
             if total_cnt == 0: break
             for card in result["cards"]:
+                if card["updatedAt"][:10] <= (datetime.datetime.now() - datetime.timedelta(90)).strftime("%Y-%m-%d"):
+                    continue
                 nm_id = card["nmID"]
                 characteristics.update({nm_id: {"subject_name": card["subjectName"], "title": card["title"]}})
                 for characteristic in card["characteristics"]:
