@@ -25,7 +25,7 @@ class Autoresponder:
         self.key_table = key_table
         self.name = name
         self.wb_token = wb_token
-        self.gc = gspread.service_account(filename="credentials.json")
+        self.gc = gspread.service_account(filename="service-credentials.json")
         self.sh = self.gc.open_by_key(key_table)
         self.characteristics = {}
 
