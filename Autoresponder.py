@@ -61,16 +61,17 @@ class Autoresponder:
                 total_text += "Приложены фото или видео\n"
             if total_text.endswith("\n"):
                 total_text = total_text[:-1]
-            rows.append({
-                "id": fb["id"],
-                "text": total_text,
-                "date_fb": fb["createdDate"],
-                "mark": fb["productValuation"],
-                "user_name": fb["userName"],
-                "subject_name": fb["subjectName"],
-                "nm_id": fb["productDetails"]["nmId"],
-                "supplier_article": fb["productDetails"]["supplierArticle"]
-            })
+            if total_text != "":
+                rows.append({
+                    "id": fb["id"],
+                    "text": total_text,
+                    "date_fb": fb["createdDate"],
+                    "mark": fb["productValuation"],
+                    "user_name": fb["userName"],
+                    "subject_name": fb["subjectName"],
+                    "nm_id": fb["productDetails"]["nmId"],
+                    "supplier_article": fb["productDetails"]["supplierArticle"]
+                })
 
         return pd.DataFrame(rows, columns=["id", "text", "date_fb", "mark", "user_name", "subject_name", "nm_id", "supplier_article"])
 
