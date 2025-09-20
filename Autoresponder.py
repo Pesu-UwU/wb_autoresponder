@@ -33,41 +33,44 @@ class Autoresponder:
         rows: List[Dict] = []
 
         take = 5000
-        res = all_requests.get_feedbacks(self.wb_token, "true", take, 0).json()
+        res = all_requests.get_feedbacks(self.wb_token, "true", take, 0, name=self.name)
+        if res is None or not res.ok:
+            print(f"[WARN][{self.name}] get_feedbacks failed")
+            return pd.DataFrame(columns=["id", "text", "date_fb", "mark", "user_name", "subject_name", "nm_id", "supplier_article"])
+        res = res.json()
         cnt_false = res["data"]["countUnanswered"]
-        print(cnt_false)
+        print(f"[INFO][{self.name}] unanswered feedbacks: {cnt_false}")
 
-        n = int((cnt_false + take - 1) / take)
-        for coef in range(n):
-            res = all_requests.get_feedbacks(self.wb_token, "false", take, coef * take).json()
-            for fb in res["data"]["feedbacks"]:
-                total_text = ""
-                text = fb["text"]  # комментарий
-                pros = fb["pros"]  # преимущества
-                cons = fb["cons"]  # недостатки
-                bables = fb["bables"]  # теги
-                if pros:
-                    total_text += f"Преимущества: {pros}\n"
-                if cons:
-                    total_text += f"Недостатки: {cons}\n"
-                if text:
-                    total_text += f"Комментарий: {text}\n"
-                if bables:
-                    total_text += f"Теги: {bables}\n"
-                if fb["photoLinks"] or fb["video"]:
-                    total_text += "Приложены фото или видео\n"
-                if total_text[-1] == "\n":
-                    total_text = total_text[:-1]
-                rows.append({
-                    "id": fb["id"],
-                    "text": total_text,
-                    "date_fb": fb["createdDate"],
-                    "mark": fb["productValuation"],
-                    "user_name": fb["userName"],
-                    "subject_name":  fb["subjectName"],
-                    "nm_id": fb["productDetails"]["nmId"],
-                    "supplier_article": fb["productDetails"]["supplierArticle"]
-                })
+        # Если нужна пагинация — можно пройтись циклами по skip
+        res = all_requests.get_feedbacks(self.wb_token, "true", take, 0, name=self.name).json()
+        for fb in res["data"]["feedbacks"]:
+            total_text = ""
+            text = fb.get("text")
+            pros = fb.get("pros")
+            cons = fb.get("cons")
+            bables = fb.get("bables")
+            if pros:
+                total_text += f"Преимущества: {pros}\n"
+            if cons:
+                total_text += f"Недостатки: {cons}\n"
+            if text:
+                total_text += f"Комментарий: {text}\n"
+            if bables:
+                total_text += f"Теги: {bables}\n"
+            if fb.get("photoLinks") or fb.get("video"):
+                total_text += "Приложены фото или видео\n"
+            if total_text.endswith("\n"):
+                total_text = total_text[:-1]
+            rows.append({
+                "id": fb["id"],
+                "text": total_text,
+                "date_fb": fb["createdDate"],
+                "mark": fb["productValuation"],
+                "user_name": fb["userName"],
+                "subject_name": fb["subjectName"],
+                "nm_id": fb["productDetails"]["nmId"],
+                "supplier_article": fb["productDetails"]["supplierArticle"]
+            })
 
         return pd.DataFrame(rows, columns=["id", "text", "date_fb", "mark", "user_name", "subject_name", "nm_id", "supplier_article"])
 
@@ -75,16 +78,20 @@ class Autoresponder:
         rows: List[Dict] = []
 
         take = 10000
-        res = all_requests.get_questions(self.wb_token, "true", take, 0).json()
+        res = all_requests.get_questions(self.wb_token, "true", take, 0, name=self.name)
+        if res is None or not res.ok:
+            print(f"[WARN][{self.name}] get_questions failed")
+            return pd.DataFrame(columns=["id", "text", "date_q"])
+        res = res.json()
         cnt_false = res["data"]["countUnanswered"]
-        print(cnt_false)
+        print(f"[INFO][{self.name}] unanswered questions: {cnt_false}")
 
-        n = int((cnt_false + take - 1) / take)
-        for coef in range(n):
-            res = all_requests.get_questions(self.wb_token, "false", take, coef * take).json()
-            for q in res["data"]["questions"]:
+        n = int((cnt_false + take - 1) / take) if cnt_false else 0
+        for coef in range(n or 1):
+            res = all_requests.get_questions(self.wb_token, "false", take, coef * take, name=self.name).json()
+            for q in res["data"].get("questions", []):
                 if q["state"] == "suppliersPortalSynch":  # только новые запросы без отклоненных
-                    print(q["text"])  #ВЫВОД
+                    print(f"[{self.name}] question: {q['text']}")
                     rows.append({
                         "id": q["id"],
                         "text": q["text"],
@@ -97,29 +104,39 @@ class Autoresponder:
         limit = 100
         nm_id = None
         updated_at = None
+        cutoff = (datetime.datetime.now() - datetime.timedelta(days=90)).strftime("%Y-%m-%d")
+
         while True:
-            result = all_requests.get_cards(self.wb_token, limit, nm_id, updated_at)
-            #all_requests.debug_print_json(result)
-            result=result.json()
-            total_cnt = result["cursor"]["total"]
-            if total_cnt == 0: break
-            for card in result["cards"]:
-                if card["updatedAt"][:10] <= (datetime.datetime.now() - datetime.timedelta(90)).strftime("%Y-%m-%d"):
+            resp = all_requests.get_cards(self.wb_token, limit, nm_id, updated_at, name=self.name)
+            if resp is None or not resp.ok:
+                print(f"[WARN][{self.name}] get_cards failed")
+                break
+            result = resp.json()
+            total_cnt = result.get("cursor", {}).get("total", 0)
+            if total_cnt == 0:
+                break
+            for card in result.get("cards", []):
+                if card.get("updatedAt", "")[:10] <= cutoff:
                     continue
-                nm_id = card["nmID"]
-                characteristics.update({nm_id: {"subject_name": card["subjectName"], "title": card["title"]}})
-                for characteristic in card["characteristics"]:
-                    characteristics[nm_id].update({characteristic["name"]: characteristic["value"]})
+                nm_id = card.get("nmID")
+                if not nm_id:
+                    continue
+                characteristics.setdefault(nm_id, {
+                    "subject_name": card.get("subjectName", ""),
+                    "title": card.get("title", "")
+                })
+                for ch in card.get("characteristics", []):
+                    name, value = ch.get("name"), ch.get("value")
+                    if name:
+                        characteristics[nm_id][name] = value
             if total_cnt < limit:
                 break
-            nm_id = result["cursor"]["nmID"]
-            updated_at = result["cursor"]["updatedAt"]
-        #all_requests.debug_print_dict(characteristics)
+            nm_id = result["cursor"].get("nmID")
+            updated_at = result["cursor"].get("updatedAt")
         return characteristics
 
-
-
-    def _compose_reply(self, obj) -> str: #  будет генериться с помощью api gpt
+    def _compose_reply(self, obj) -> str:
+        """Генерация ответа. Без каких-либо маркеров/AI-META."""
         if hasattr(obj, "mark"):
             prompt = (f"""
             Ты — живой, человечный и немного ироничный представитель бренда, который продаёт товары на маркетплейсе. 
@@ -143,75 +160,62 @@ class Autoresponder:
 
             ЖЁСТКИЕ ЗАПРЕТЫ:
             - Нельзя вставлять текст отзыва или метаданные (Оценка, Товар, Теги и пр.).  
-            - Никаких фраз, которые подрывают бренд: «реальность отличается от рекламы», «разочаровывающе», «не оправдало ожиданий», «к сожалению», «увы», «деньги на ветер».  
+            - Никаких фраз, которые подрывают бренд.  
             - Не упоминать возвраты, доставку, логику WB. Только про товар и эмоции.  
 
             СТИЛЬ:
             - Общение только на «вы».  
-            - Приветствие с именем, если оно адекватное. Если имя пустое или странное — писать без него («Здравствуйте!»).  
-            - Тёплый, человечный тон. Можно использовать максимум 2 эмодзи, если они уместны.  
-            - 3–7 предложений, 350–800 знаков. Меняй длину и ритм фраз, чтобы не выглядело однообразно.  
+            - Приветствие с именем, если оно адекватное. Если имя пустое или странное — пишем без него («Здравствуйте!»).  
+            - Тёплый, человечный тон. Макс. 2 эмодзи при уместности.  
+            - 3–7 предложений, 350–800 знаков.  
 
             РЕКОМЕНДАЦИЯ:
-            - Обязательно предложи один другой товар из characteristics:  
+            - Обязательно предложи один другой товар из characteristics (не тот же nm_id):  
               • логично дополняющий или заменяющий текущий;  
-              • не тот же nm_id;  
               • упомяни название и «арт. XXXXXXX»;  
               • подай как дружеский совет («А вот, к слову, есть ещё …, арт. …»).  
-            - Варьируй подводки: «К слову…», «Если вдруг…», «В продолжение…», «Из той же серии…».  
+
             ВЫХОД:
-            - Один законченный ответ без лишних служебных вставок.  
-            - На «вы», без оправданий бренда и без вставки текста отзыва.
+            - Один законченный ответ бренда без служебных вставок.
             """)
-            resp = all_requests.ask_gpt(prompt)
+            resp = all_requests.ask_gpt(prompt, name=self.name)
         else:
             sh = self.gc.open_by_key(GOOGLE_TABLE_KEY_DATA_OF_PATTERNS).worksheet("1 Вариант")
             data = json.dumps(sh.get_all_values(), ensure_ascii=False)
-
-            prompt = (f"Ты автоответчик продавца товара на маркетплейсе Wildberries. Тебе нужно ответить на отзыв покупателя по следующим шаблонам. Данные будут в виде JSON. "
-                      f"Если отсутствует ответ на вопрос, значит верным ответом является последний встретившийся. Шаблоны: {data}. "
-                      f"Если считаешь, что вопрос следует отклонить, верни строку REJECTED. При необходимости - импровизируй. "
-                      f"Если считаешь, что ты не попал в суть вопроса с вероятностью 1/2, то в конце ответа поставь 2 символа *. Если не уверен, что стоит отклонить - не отклоняй."
+            prompt = (f"Ты автоответчик продавца товара на маркетплейсе Wildberries. Тебе нужно ответить на отзыв покупателя по следующим шаблонам. "
+                      f"Данные будут в виде JSON. Если отсутствует ответ на вопрос, значит верным ответом является последний встретившийся. "
+                      f"Шаблоны: {data}. Если считаешь, что вопрос следует отклонить, верни строку REJECTED. При необходимости - импровизируй. "
+                      f"Если считаешь, что ты не попал в суть вопроса с вероятностью 1/2, то в конце ответа поставь 2 символа *. Если не уверен, что стоит отклонить - не отклоняй. "
                       f"Вот вопрос: {obj.text}")
-            resp = all_requests.ask_gpt(prompt)
+            resp = all_requests.ask_gpt(prompt, name=self.name)
 
-        data = resp.json()
         reply = ""
-        if resp.ok:
+        if resp is not None and resp.ok:
             data = resp.json()
             choices = data.get("choices") or []
             if choices:
-                reply = choices[0].get("message", {}).get("content", "")
-        if not reply:
-            print(f"[WARN] GPT empty reply: {data}")
-            all_requests.debug_print_json(resp)
-        print(f"[GPT] given text: {obj.text}")
-        print(f"[GPT] reply: {reply}")
-        return reply
+                reply = choices[0].get("message", {}).get("content", "") or ""
 
+        if not reply:
+            print(f"[WARN][{self.name}] GPT empty reply")
+            if resp is not None:
+                all_requests.debug_print_json(resp, name=self.name)
+
+        print(f"[GPT][{self.name}] given text: {getattr(obj, 'text', '')}")
+        print(f"[GPT][{self.name}] reply: {reply}")
+        return reply
 
     def _send_reply(self, obj, reply: str):
         if hasattr(obj, "mark"):
-            resp = all_requests.send_reply_feedback(self.wb_token, obj.id, reply)
+            resp = all_requests.send_reply_feedback(self.wb_token, obj.id, reply, name=self.name)
         else:
             state = "none" if reply == "REJECTED" else "wbRu"
-            resp = all_requests.send_reply_question(self.wb_token, obj.id, reply, state)
-        if resp.ok:
-            print(f"[INFO] Sent reply for id={obj.id}")
-        else:
-            print(f"[WARN] Failed to send reply for id={obj.id}, status={resp.status_code}")
-        return resp.ok
-
-    def _append_rows_bulk_bottom(self, name_sheet: str, rows: list[list]):
-        for attempt in range(1, MAX_RETRIES + 1):
-            try:
-                ws = self.sh.worksheet(name_sheet)
-                ws.append_rows(rows, value_input_option=ValueInputOption.raw)  # noqa
-                print(f"[INFO] Appended {len(rows)} rows to sheet '{name_sheet}' for {self.name}")
-                break
-            except Exception as ex:
-                print(f"[WARN] Failed to append rows to sheet '{name_sheet}' for {self.name}: {ex}")
-                time.sleep(ERROR_SLEEP_TIME)
+            resp = all_requests.send_reply_question(self.wb_token, obj.id, reply, state, name=self.name)
+        if resp and resp.ok:
+            print(f"[INFO][{self.name}] Sent reply for id={obj.id}")
+            return True
+        print(f"[WARN][{self.name}] Failed to send reply for id={obj.id}, status={getattr(resp, 'status_code', 'NA')}")
+        return False
 
     def _append_rows_bulk_top(self, name_sheet: str, rows: list[list]):
         if not rows:
@@ -219,17 +223,12 @@ class Autoresponder:
         for attempt in range(1, MAX_RETRIES + 1):
             try:
                 ws = self.sh.worksheet(name_sheet)
-                # вставляем ПОД заголовок (строка 2) и в перевёрнутом порядке,
-                # чтобы первая новая запись оказалась выше остальных
-                ws.insert_rows(
-                    rows[::-1],  # <- РЕВЕРС важен, чтобы верхом шла последняя добавленная
-                    row=2,
-                    value_input_option=ValueInputOption.raw
-                )
-                print(f"[INFO] Prepended {len(rows)} rows to sheet '{name_sheet}' for {self.name}")
+                # вставляем под заголовок (строка 2); rows[::-1] — чтобы «верхом» шла последняя добавленная
+                ws.insert_rows(rows[::-1], row=2, value_input_option=ValueInputOption.raw)
+                print(f"[INFO][{self.name}] Prepended {len(rows)} rows to sheet '{name_sheet}'")
                 break
             except Exception as ex:
-                print(f"[WARN] Failed to prepend rows to sheet '{name_sheet}' for {self.name}: {ex}")
+                print(f"[WARN][{self.name}] Failed to prepend rows to sheet '{name_sheet}': {ex}")
                 time.sleep(ERROR_SLEEP_TIME)
 
     def update_feedbacks(self):
@@ -237,17 +236,15 @@ class Autoresponder:
         feedbacks = self._get_feedbacks()
         i = 0
         for fb in feedbacks.itertuples():
-            # if i == 50:
-            #     break
             reply = self._compose_reply(fb)
-            #exit(0)
             if not reply:
                 continue
+
             date_ans = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             check = self._send_reply(fb, reply)
             if check:
-               rows_to_write.append([fb.supplier_article, fb.nm_id, fb.date_fb, fb.mark, fb.text, reply, date_ans])  # noqa
-            #rows_to_write.append([fb.supplier_article, fb.nm_id, fb.date_fb, fb.mark, fb.text, reply, date_ans])  # noqa
+                rows_to_write.append([fb.supplier_article, fb.nm_id, fb.date_fb, fb.mark, fb.text, reply, date_ans])
+
             i += 1
             if i == 1 and rows_to_write:
                 i = 0
@@ -259,20 +256,17 @@ class Autoresponder:
         questions = self._get_questions()
         for q in questions.itertuples():
             reply = self._compose_reply(q)
-            exit(0)
             if not reply:
                 continue
             check = self._send_reply(q, reply)
             if check:
-                rows_to_write.append([q.text, q.date_q, reply])  # noqa
+                rows_to_write.append([q.text, q.date_q, reply])
         if rows_to_write:
-            self._append_rows_bulk("Вопросы", rows_to_write)
-
+            ws = self.sh.worksheet("Вопросы")
+            ws.insert_rows(rows_to_write[::-1], row=2, value_input_option=ValueInputOption.raw)
 
     def start_autoresponder(self):
-        #all_requests.debug_print_json(all_requests.get_cards_trash(self.wb_token, 100))
+        print(f"[INFO] Start autoresponder for {self.name}")
         self.characteristics = self._get_characteristics()
-        #exit(0)
-        #all_requests.debug_print_dict(self.characteristics)
         self.update_feedbacks()
-        #self.update_questions()
+        # self.update_questions()
