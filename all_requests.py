@@ -15,6 +15,12 @@ JITTER_MAX = 5.0            # +/- секунд к задержке, чтобы �
 
 RETRIABLE_STATUS = {429, 500, 502, 503, 504}
 
+OPENAI_COOLDOWN_SEC = int(os.getenv("OPENAI_COOLDOWN_SEC", "60"))  # 15 минут по умолчанию
+LOG_OPENAI_KEY_PREFIX = os.getenv("LOG_OPENAI_KEY_PREFIX", "1") == "1"
+
+_openai_pause_until = 0.0
+_logged_key_prefix = False
+
 
 def _pretty_err_text(resp: Optional[requests.Response]) -> str:
     """Аккуратно вытащить краткое описание ошибки из ответа (если это JSON)."""
@@ -224,14 +230,47 @@ def get_cards(token: str, limit: int, nm_id: int | None, updated_at: str | None,
 # ------------------ OPENAI ------------------
 
 def ask_gpt(prompt: str, name: str):
+    """
+    Вызов OpenAI Chat Completions с:
+    - опциональными заголовками OpenAI-Organization / OpenAI-Project (из env),
+    - выводом префикса API-ключа (для верификации),
+    - глобальным кулдауном при 'insufficient_quota'.
+    """
+    global _openai_pause_until, _logged_key_prefix
+
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         print(f"[WARN][{name}] OPENAI_API_KEY not set")
         return None
-    return _request(
+
+    now = time.time()
+    if now < _openai_pause_until:
+        until = int(_openai_pause_until - now)
+        print(f"[WARN][{name}] OpenAI cooldown active ({until}s left). Skipping GPT call.")
+        return None
+
+    # Лог префикса ключа, чтобы убедиться, что используем нужный ключ из нужного аккаунта/проекта
+    if LOG_OPENAI_KEY_PREFIX and not _logged_key_prefix:
+        masked = f"{api_key[:8]}...{api_key[-4:]}" if len(api_key) > 12 else "****"
+        print(f"[INFO][{name}] Using OpenAI key prefix: {masked}")
+        _logged_key_prefix = True
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    # Явно укажем организацию/проект, если заданы (важно, если ключи/лимиты висят на конкретном org/project)
+    org = os.getenv("OPENAI_ORG")
+    if org:
+        headers["OpenAI-Organization"] = org
+    project = os.getenv("OPENAI_PROJECT")
+    if project:
+        headers["OpenAI-Project"] = project
+
+    resp = _request(
         "POST",
         "https://api.openai.com/v1/chat/completions",
-        {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        headers,
         0.4,
         json={
             "model": "gpt-4o-mini",
@@ -240,3 +279,19 @@ def ask_gpt(prompt: str, name: str):
         },
         name=name,
     )
+
+    # Если «недостаточно квоты» — включаем глобальный кулдаун, чтобы не спамить 429.
+    try:
+        if resp is not None and resp.status_code == 429:
+            data = resp.json()
+            err = (data or {}).get("error", {}) if isinstance(data, dict) else {}
+            etype = err.get("type") or ""
+            ecode = err.get("code") or ""
+            if etype == "insufficient_quota" or ecode == "insufficient_quota":
+                _openai_pause_until = time.time() + OPENAI_COOLDOWN_SEC
+                print(f"[WARN][{name}] OpenAI insufficient_quota -> pausing GPT calls for {OPENAI_COOLDOWN_SEC}s")
+    except Exception:
+        pass
+
+    return resp
+

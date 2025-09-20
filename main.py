@@ -13,6 +13,18 @@ from dotenv import load_dotenv
 
 from Autoresponder import Autoresponder
 
+import logging
+import sys
+
+# Настройка логов один раз в main.py (или в entrypoint)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] [%(threadName)s] %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+logger = logging.getLogger(__name__)
+
+
 load_dotenv()
 
 TELEBOT_TOKEN = os.getenv("TELEBOT_TOKEN")
@@ -20,7 +32,7 @@ TABLE_DATA = os.getenv("TABLE_DATA")  # ключ гугл-таблицы с кл
 MAX_WORKERS = int(os.getenv("MAX_WORKERS", "6"))          # верхняя граница параллельных клиентов
 CLIENT_RETRIES = int(os.getenv("CLIENT_RETRIES", "3"))    # ретраи на клиента
 RETRY_SLEEP_SEC = int(os.getenv("RETRY_SLEEP_SEC", "300"))
-SCHEDULE_SECONDS = int(os.getenv("SCHEDULE_SECONDS", "1"))  # тик планировщика
+SCHEDULE_SECONDS = int(os.getenv("SCHEDULE_SECONDS", "30"))  # тик планировщика
 
 bot = telebot.TeleBot(TELEBOT_TOKEN)
 
@@ -76,12 +88,12 @@ def _run_client_task(key_table: str, name: str, wb_token: str):
             updater.start()
             return
         except Exception as ex:
-            msg = f"ERROR AUTORESPONDER\nname:{name}\ntry:{attempt}/{CLIENT_RETRIES}\nError: {ex}"
-            print(msg)
-            try:
-                bot.send_message("-1002417112074", msg)
-            except Exception:
-                pass
+            msg = f"ERROR AUTORESPONDER name:{name} try:{attempt}/{CLIENT_RETRIES} Error: {ex}"
+            logger.exception(msg)  # тут автоматически добавит traceback
+            # try:
+            #     bot.send_message("-1002417112074", msg)
+            # except Exception:
+            #     logger.warning("Failed to send error message to Telegram", exc_info=True)
             if attempt < CLIENT_RETRIES:
                 time.sleep(RETRY_SLEEP_SEC)
 
