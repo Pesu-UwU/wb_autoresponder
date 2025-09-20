@@ -164,7 +164,7 @@ def get_feedbacks(token: str, unanswered: str, take: int, skip: int, name: str):
 def send_reply_feedback(token: str, fb_id: int, reply: str, name: str):
     return _request(
         "POST",
-        "https://feedbacks-api.wildberries.ru/api/v1/feedbacks/comments",
+        "https://feedbacks-api.wildberries.ru/api/v1/feedbacks/answer",
         {"Authorization": token, "Content-Type": "application/json"},
         0.4,
         json={"id": fb_id, "text": reply},
